@@ -1,0 +1,121 @@
+{
+  "name": "FutureSelf AI — Profil → İkiz → Yol Haritası",
+  "nodes": [
+    {
+      "parameters": { "httpMethod": "POST", "path": "futureself-profile", "responseMode": "responseNode", "options": {} },
+      "id": "n1", "name": "Webhook: Profil Formu", "type": "n8n-nodes-base.webhook", "typeVersion": 2, "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const b = $json.body || {};\nconst errors = [];\nif (!b.user_id) errors.push('user_id eksik');\nif (!b.goals || b.goals.length < 5) errors.push('hedef çok kısa');\nif (!Array.isArray(b.skills) || b.skills.length === 0) errors.push('en az bir beceri gerekli');\nif (errors.length) throw new Error('Doğrulama hatası: ' + errors.join(', '));\nreturn [{ json: { profile: b } }];"
+      },
+      "id": "n2", "name": "Profil Doğrula", "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [240, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "anthropicApi",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [ { "name": "anthropic-version", "value": "2023-06-01" } ] },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: 'claude-sonnet-5-5', max_tokens: 1500, system: 'Sen Profil Analiz Agent\\'ısın. Kullanıcı profilinden güçlü yönleri ve beceri eksiklerini çıkar. Sadece geçerli JSON döndür: {\"twin\":{\"summary\":\"\",\"strengths\":[]},\"skill_gaps\":[{\"skill\":\"\",\"current\":0,\"target\":0}]}. Geleceği kesin bilirmiş gibi konuşma.', messages: [{ role: 'user', content: JSON.stringify($json.profile) }] }) }}",
+        "options": {}
+      },
+      "id": "n3", "name": "AI Profil Analiz Agent", "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [480, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const analysis = JSON.parse($json.content[0].text);\nreturn [{ json: { profile: $('Profil Doğrula').item.json.profile, analysis } }];"
+      },
+      "id": "n4", "name": "Analizi Ayrıştır", "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [720, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "anthropicApi",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [ { "name": "anthropic-version", "value": "2023-06-01" } ] },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: 'claude-sonnet-5-5', max_tokens: 2500, system: 'Sen Kariyer Planlama Agent\\'ısın. Profil ve analizden 2-4 kariyer yolu, 30 günlük haftalık görevler ve ölçülebilir kilometre taşları üret. Yalnızca agent_output_schema.json şemasına uyan JSON döndür (twin, career_paths, skill_gaps, weekly_tasks, milestones).', messages: [{ role: 'user', content: JSON.stringify({ profile: $json.profile, analysis: $json.analysis }) }] }) }}",
+        "options": {}
+      },
+      "id": "n5", "name": "Kariyer Planlama Agent", "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [960, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const out = JSON.parse($json.content[0].text);\nconst need = ['twin','career_paths','skill_gaps','weekly_tasks','milestones'];\nconst missing = need.filter(k => !(k in out));\nif (missing.length) throw new Error('Eksik alanlar: ' + missing.join(', '));\nif (!Array.isArray(out.weekly_tasks) || out.weekly_tasks.length < 4) throw new Error('weekly_tasks yetersiz');\nconst user_id = $('Profil Doğrula').item.json.profile.user_id;\nreturn [{ json: { user_id, out } }];"
+      },
+      "id": "n6", "name": "JSON Doğrula", "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [1200, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/rpc/save_futureself_result",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "apikey", "value": "={{ $env.SUPABASE_SERVICE_KEY }}" },
+          { "name": "Authorization", "value": "=Bearer {{ $env.SUPABASE_SERVICE_KEY }}" }
+        ] },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ p_user_id: $json.user_id, p_result: $json.out }) }}",
+        "options": {}
+      },
+      "id": "n7", "name": "Supabase'e Kaydet", "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [1440, 0]
+    },
+    {
+      "parameters": { "respondWith": "json", "responseBody": "={{ JSON.stringify({ ok: true }) }}" },
+      "id": "n8", "name": "Panele Yanıt Dön", "type": "n8n-nodes-base.respondToWebhook", "typeVersion": 1.1, "position": [1680, 0]
+    },
+    {
+      "parameters": { "rule": { "interval": [ { "field": "weeks", "weeksInterval": 1, "triggerAtDay": [0], "triggerAtHour": 18 } ] } },
+      "id": "n9", "name": "Her Pazar 18:00", "type": "n8n-nodes-base.scheduleTrigger", "typeVersion": 1.2, "position": [0, 320]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/tasks?done=eq.false&select=user_id,title,week",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "apikey", "value": "={{ $env.SUPABASE_SERVICE_KEY }}" },
+          { "name": "Authorization", "value": "=Bearer {{ $env.SUPABASE_SERVICE_KEY }}" }
+        ] },
+        "options": {}
+      },
+      "id": "n10", "name": "Açık Görevleri Çek", "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [240, 320]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "anthropicApi",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [ { "name": "anthropic-version", "value": "2023-06-01" } ] },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: 'claude-sonnet-5-5', max_tokens: 600, system: 'Sen Mentor Agent\\'ısın. Tamamlanmayan görevlere bakıp kısa, uygulanabilir bir haftalık değerlendirme yaz. Planı küçült, suçlama yapma.', messages: [{ role: 'user', content: JSON.stringify($input.all().map(i => i.json)) }] }) }}",
+        "options": {}
+      },
+      "id": "n11", "name": "Mentor: Haftalık Değerlendirme", "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [480, 320]
+    }
+  ],
+  "connections": {
+    "Webhook: Profil Formu": { "main": [ [ { "node": "Profil Doğrula", "type": "main", "index": 0 } ] ] },
+    "Profil Doğrula": { "main": [ [ { "node": "AI Profil Analiz Agent", "type": "main", "index": 0 } ] ] },
+    "AI Profil Analiz Agent": { "main": [ [ { "node": "Analizi Ayrıştır", "type": "main", "index": 0 } ] ] },
+    "Analizi Ayrıştır": { "main": [ [ { "node": "Kariyer Planlama Agent", "type": "main", "index": 0 } ] ] },
+    "Kariyer Planlama Agent": { "main": [ [ { "node": "JSON Doğrula", "type": "main", "index": 0 } ] ] },
+    "JSON Doğrula": { "main": [ [ { "node": "Supabase'e Kaydet", "type": "main", "index": 0 } ] ] },
+    "Supabase'e Kaydet": { "main": [ [ { "node": "Panele Yanıt Dön", "type": "main", "index": 0 } ] ] },
+    "Her Pazar 18:00": { "main": [ [ { "node": "Açık Görevleri Çek", "type": "main", "index": 0 } ] ] },
+    "Açık Görevleri Çek": { "main": [ [ { "node": "Mentor: Haftalık Değerlendirme", "type": "main", "index": 0 } ] ] }
+  },
+  "settings": { "executionOrder": "v1" }
+}

@@ -1,0 +1,839 @@
+{
+  "name": "ANKAFEST — Başvuru, QR e-posta, kapı okutma, günlük rapor",
+  "nodes": [
+    {
+      "id": "a1",
+      "name": "Webhook: Başvuru",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ankafest-basvuru",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      }
+    },
+    {
+      "id": "a2",
+      "name": "Ayarlar (başvuru)",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "s1",
+              "name": "supabaseUrl",
+              "value": "https://PROJE-ID.supabase.co",
+              "type": "string"
+            },
+            {
+              "id": "s2",
+              "name": "organizerEmail",
+              "value": "organizasyon@ornek.com",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      }
+    },
+    {
+      "id": "a3",
+      "name": "Doğrula ve kod üret",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const b = $json.body || {};\nconst errors = [];\nif (!['yarismaci', 'ziyaretci'].includes(b.type)) errors.push('type');\nif (!b.full_name || String(b.full_name).trim().length < 3) errors.push('full_name');\nif (!/^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$/.test(b.email || '')) errors.push('email');\nif (b.kvkk !== true) errors.push('kvkk');\nif (b.type === 'yarismaci' && (!b.team_name || !b.project_name)) errors.push('team_name/project_name');\nconst A = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';\nlet code = 'ANK-';\nfor (let i = 0; i < 6; i++) code += A[Math.floor(Math.random() * A.length)];\nconst clean = s => (s || '').toString().trim().slice(0, 500);\nreturn [{ json: { valid: errors.length === 0, errors, record: {\n  code, type: b.type, full_name: clean(b.full_name), email: clean(b.email).toLowerCase(),\n  phone: clean(b.phone), org: clean(b.org), team_name: clean(b.team_name), category: clean(b.category),\n  project_name: clean(b.project_name), team_size: Number(b.team_size) || null,\n  project_summary: clean(b.project_summary), visit_pref: clean(b.visit_pref),\n  party_size: Number(b.party_size) || null, kvkk: true } } }];"
+      }
+    },
+    {
+      "id": "a4",
+      "name": "Geçerli mi",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        660,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "a5",
+      "name": "Supabase'e kaydet",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        900,
+        -100
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Ayarlar (başvuru)').first().json.supabaseUrl }}/rest/v1/ankafest_registrations",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "options": {},
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.record) }}"
+      }
+    },
+    {
+      "id": "a6",
+      "name": "QR ve e-posta hazırla",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1140,
+        -100
+      ],
+      "parameters": {
+        "jsCode": "const r = $('Doğrula ve kod üret').first().json.record;\nconst qr = 'https://quickchart.io/qr?size=360&margin=2&text=' + encodeURIComponent(r.code);\nconst detay = r.type === 'yarismaci'\n  ? ('Takım: ' + r.team_name + ' (' + r.category + ')<br>Proje: ' + r.project_name)\n  : ('Ziyaret tercihi: ' + (r.visit_pref || '-') + '<br>Kişi sayısı: ' + (r.party_size || 1));\nconst html = '<div style=\"font-family:Arial,sans-serif;max-width:520px\">'\n  + '<h2>ANKAFEST biletin hazır</h2><p>Merhaba ' + r.full_name + ',</p>'\n  + '<p>Başvurun alındı.<br>' + detay + '</p>'\n  + '<p><img src=\"' + qr + '\" width=\"220\" height=\"220\" alt=\"QR kod\"></p>'\n  + '<p>Kodun: <b>' + r.code + '</b></p>'\n  + '<p>Girişte bu QR kodu okut. Giriş ve çıkış saatlerin otomatik kaydedilir. QR kod ekte de yer alır.</p></div>';\nreturn [{ json: { code: r.code, email: r.email, qr, subject: 'ANKAFEST biletin hazır · ' + r.code, html } }];"
+      }
+    },
+    {
+      "id": "a7",
+      "name": "QR görselini indir",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1380,
+        -100
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.qr }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "data"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "a8",
+      "name": "E-posta gönder",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1620,
+        -100
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "sendTo": "={{ $('QR ve e-posta hazırla').first().json.email }}",
+        "subject": "={{ $('QR ve e-posta hazırla').first().json.subject }}",
+        "emailType": "html",
+        "message": "={{ $('QR ve e-posta hazırla').first().json.html }}",
+        "options": {
+          "attachmentsUi": {
+            "attachmentsBinary": [
+              {
+                "property": "data"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "a9",
+      "name": "Yanıt: başarılı",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1860,
+        -100
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: true, code: $('QR ve e-posta hazırla').first().json.code }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      }
+    },
+    {
+      "id": "a10",
+      "name": "Yanıt: hatalı",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        900,
+        120
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: false, errors: $json.errors }) }}",
+        "options": {
+          "responseCode": 400
+        }
+      }
+    },
+    {
+      "id": "b1",
+      "name": "Webhook: Kapı",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        500
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ankafest-kapi",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      }
+    },
+    {
+      "id": "b2",
+      "name": "Ayarlar (kapı)",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        220,
+        500
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "s1",
+              "name": "supabaseUrl",
+              "value": "https://PROJE-ID.supabase.co",
+              "type": "string"
+            },
+            {
+              "id": "s2",
+              "name": "organizerEmail",
+              "value": "organizasyon@ornek.com",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      }
+    },
+    {
+      "id": "b3",
+      "name": "Kodu hazırla",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        500
+      ],
+      "parameters": {
+        "jsCode": "const b = $json.body || {};\nreturn [{ json: {\n  code: String(b.code || '').trim().toUpperCase(),\n  gate: String(b.gate || 'Ana kapı').slice(0, 60) } }];"
+      }
+    },
+    {
+      "id": "b4",
+      "name": "Kayıt bul",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        660,
+        500
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('Ayarlar (kapı)').first().json.supabaseUrl }}/rest/v1/ankafest_registrations?select=code,full_name,type&code=eq.{{ $json.code }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "options": {}
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "b5",
+      "name": "Kayıt var mı",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        880,
+        500
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.code }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "b6",
+      "name": "Son hareketi bul",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1100,
+        420
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('Ayarlar (kapı)').first().json.supabaseUrl }}/rest/v1/ankafest_scans?select=type,ts&order=ts.desc&limit=1&code=eq.{{ $json.code }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "options": {}
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "b7",
+      "name": "Giriş mi çıkış mı",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        420
+      ],
+      "parameters": {
+        "jsCode": "const reg = $('Kayıt bul').first().json;\nconst last = $json.type ? $json : null;\nconst dup = !!(last && (Date.now() - new Date(last.ts).getTime() < 5000));\nconst next = last && last.type === 'giris' ? 'cikis' : 'giris';\nreturn [{ json: { dup, next, name: reg.full_name, code: reg.code, who: reg.type,\n  gate: $('Kodu hazırla').first().json.gate, ts: new Date().toISOString() } }];"
+      }
+    },
+    {
+      "id": "b8",
+      "name": "Tekrar mı",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1540,
+        420
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.dup }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "b9",
+      "name": "Hareketi kaydet",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1780,
+        520
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Ayarlar (kapı)').first().json.supabaseUrl }}/rest/v1/ankafest_scans",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "options": {},
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ code: $json.code, type: $json.next, gate: $json.gate, ts: $json.ts }) }}"
+      }
+    },
+    {
+      "id": "b10",
+      "name": "Yanıt: kaydedildi",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        2020,
+        520
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: true, name: $('Giriş mi çıkış mı').first().json.name, type: $('Giriş mi çıkış mı').first().json.next, ts: $('Giriş mi çıkış mı').first().json.ts }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      }
+    },
+    {
+      "id": "b11",
+      "name": "Yanıt: tekrar",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1780,
+        330
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: false, msg: 'Bu kod az önce okutuldu.' }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      }
+    },
+    {
+      "id": "b12",
+      "name": "Yanıt: bulunamadı",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1100,
+        640
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: false, msg: 'Kod bulunamadı.' }) }}",
+        "options": {
+          "responseCode": 404
+        }
+      }
+    },
+    {
+      "id": "c1",
+      "name": "Her gün 20:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        900
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "daysInterval": 1,
+              "triggerAtHour": 20
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "c2",
+      "name": "Ayarlar (rapor)",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        220,
+        900
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "s1",
+              "name": "supabaseUrl",
+              "value": "https://PROJE-ID.supabase.co",
+              "type": "string"
+            },
+            {
+              "id": "s2",
+              "name": "organizerEmail",
+              "value": "organizasyon@ornek.com",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      }
+    },
+    {
+      "id": "c3",
+      "name": "Katılım verisini çek",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        900
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('Ayarlar (rapor)').first().json.supabaseUrl }}/rest/v1/ankafest_attendance?select=*",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "options": {}
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "c4",
+      "name": "Rapor hazırla",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        900
+      ],
+      "parameters": {
+        "jsCode": "const rows = $input.all().map(i => i.json).filter(r => r.code);\nconst seen = rows.filter(r => r.first_in);\nconst inside = rows.filter(r => r.inside).length;\nconst avg = seen.length ? Math.round(seen.reduce((a, r) => a + (r.total_minutes || 0), 0) / seen.length) : 0;\nconst fmt = t => t ? new Date(t).toLocaleTimeString('tr-TR', { timeZone: 'Europe/Istanbul' }) : '-';\nconst list = seen.map(r => '<tr><td>' + r.full_name + '</td><td>' + r.type + '</td><td>' + fmt(r.first_in)\n  + '</td><td>' + fmt(r.last_out) + '</td><td>' + r.total_minutes + ' dk</td></tr>').join('');\nconst html = '<h2>ANKAFEST günlük katılım raporu</h2><p>Kayıt: ' + rows.length + ' · Giriş yapan: ' + seen.length\n  + ' · İçeride: ' + inside + ' · Ortalama kalış: ' + avg + ' dk</p>'\n  + '<table border=\"1\" cellpadding=\"6\" cellspacing=\"0\"><tr><th>Ad</th><th>Tür</th><th>İlk giriş</th><th>Son çıkış</th><th>Süre</th></tr>' + list + '</table>';\nreturn [{ json: { html } }];"
+      }
+    },
+    {
+      "id": "c5",
+      "name": "Raporu e-postala",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        880,
+        900
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "sendTo": "={{ $('Ayarlar (rapor)').first().json.organizerEmail }}",
+        "subject": "ANKAFEST günlük katılım raporu",
+        "emailType": "html",
+        "message": "={{ $json.html }}",
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "Webhook: Başvuru": {
+      "main": [
+        [
+          {
+            "node": "Ayarlar (başvuru)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ayarlar (başvuru)": {
+      "main": [
+        [
+          {
+            "node": "Doğrula ve kod üret",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Doğrula ve kod üret": {
+      "main": [
+        [
+          {
+            "node": "Geçerli mi",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Geçerli mi": {
+      "main": [
+        [
+          {
+            "node": "Supabase'e kaydet",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Yanıt: hatalı",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase'e kaydet": {
+      "main": [
+        [
+          {
+            "node": "QR ve e-posta hazırla",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "QR ve e-posta hazırla": {
+      "main": [
+        [
+          {
+            "node": "QR görselini indir",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "QR görselini indir": {
+      "main": [
+        [
+          {
+            "node": "E-posta gönder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "E-posta gönder": {
+      "main": [
+        [
+          {
+            "node": "Yanıt: başarılı",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook: Kapı": {
+      "main": [
+        [
+          {
+            "node": "Ayarlar (kapı)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ayarlar (kapı)": {
+      "main": [
+        [
+          {
+            "node": "Kodu hazırla",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Kodu hazırla": {
+      "main": [
+        [
+          {
+            "node": "Kayıt bul",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Kayıt bul": {
+      "main": [
+        [
+          {
+            "node": "Kayıt var mı",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Kayıt var mı": {
+      "main": [
+        [
+          {
+            "node": "Son hareketi bul",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Yanıt: bulunamadı",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Son hareketi bul": {
+      "main": [
+        [
+          {
+            "node": "Giriş mi çıkış mı",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Giriş mi çıkış mı": {
+      "main": [
+        [
+          {
+            "node": "Tekrar mı",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tekrar mı": {
+      "main": [
+        [
+          {
+            "node": "Yanıt: tekrar",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Hareketi kaydet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hareketi kaydet": {
+      "main": [
+        [
+          {
+            "node": "Yanıt: kaydedildi",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Her gün 20:00": {
+      "main": [
+        [
+          {
+            "node": "Ayarlar (rapor)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ayarlar (rapor)": {
+      "main": [
+        [
+          {
+            "node": "Katılım verisini çek",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Katılım verisini çek": {
+      "main": [
+        [
+          {
+            "node": "Rapor hazırla",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rapor hazırla": {
+      "main": [
+        [
+          {
+            "node": "Raporu e-postala",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

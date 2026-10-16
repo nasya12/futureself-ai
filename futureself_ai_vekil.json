@@ -1,0 +1,298 @@
+{
+  "name": "FutureSelf · AI Vekil (tam demo)",
+  "nodes": [
+    {
+      "id": "v1",
+      "name": "Webhook: AI İsteği",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        200
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "futureself-ai",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      }
+    },
+    {
+      "id": "v2",
+      "name": "Ayarlar",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        220,
+        200
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "s1",
+              "name": "model",
+              "value": "claude-sonnet-5-5",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      }
+    },
+    {
+      "id": "v3",
+      "name": "Doğrula",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        200
+      ],
+      "parameters": {
+        "jsCode": "// Tam demo sayfasından gelen isteği doğrula; API anahtarı tarayıcıya hiç çıkmaz.\nconst raw = $input.first().json;\nconst b = raw.body ?? raw;\nconst prompt = String(b.prompt ?? '').trim();\nconst system = String(b.system ?? 'Sen FutureSelf AI için çalışan yardımcı bir yapay zekâsın. Türkçe yaz.').slice(0, 2000);\nconst maxTokens = Math.max(200, Math.min(2000, Number(b.maxTokens) || 1200));\nlet error = null;\nif (!prompt) error = 'Boş istek.';\nelse if (prompt.length > 8000) error = 'İstek çok uzun.';\nreturn [{ json: { valid: !error, error, request: { model: $('Ayarlar').first().json.model, max_tokens: maxTokens, system, messages: [{ role: 'user', content: prompt }] } } }];"
+      }
+    },
+    {
+      "id": "v4",
+      "name": "Geçerli mi",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        660,
+        200
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "v5",
+      "name": "AI: Claude'a Sor",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        880,
+        100
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "anthropicApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.request) }}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "v6",
+      "name": "Metni Çıkar",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        60
+      ],
+      "parameters": {
+        "jsCode": "const r = $input.first().json;\nconst text = (r?.content ?? []).filter((c) => c.type === 'text').map((c) => c.text).join('');\nreturn [{ json: { text, truncated: r?.stop_reason === 'max_tokens' } }];"
+      }
+    },
+    {
+      "id": "v7",
+      "name": "Yanıt: Metin",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1320,
+        60
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "v8",
+      "name": "Yanıt: Hatalı İstek",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        880,
+        320
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ error: $json.error }) }}",
+        "options": {
+          "responseCode": 400,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "v9",
+      "name": "Yanıt: AI Hatası",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1100,
+        240
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ error: 'AI yanıt veremedi.' }) }}",
+        "options": {
+          "responseCode": 502,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook: AI İsteği": {
+      "main": [
+        [
+          {
+            "node": "Ayarlar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ayarlar": {
+      "main": [
+        [
+          {
+            "node": "Doğrula",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Doğrula": {
+      "main": [
+        [
+          {
+            "node": "Geçerli mi",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Geçerli mi": {
+      "main": [
+        [
+          {
+            "node": "AI: Claude'a Sor",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Yanıt: Hatalı İstek",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI: Claude'a Sor": {
+      "main": [
+        [
+          {
+            "node": "Metni Çıkar",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Yanıt: AI Hatası",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Metni Çıkar": {
+      "main": [
+        [
+          {
+            "node": "Yanıt: Metin",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

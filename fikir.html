@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>FutureSelf AI · Fikir Panosu</title>
+<meta name="description" content="Fikrini yaz; n8n ve yapay zekâ değerlendirsin, Supabase'e kaydedilsin, listede görünsün.">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,800;1,700&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16 3l10 8-10 18L6 11z' fill='%23ff4fa3'/%3E%3C/svg%3E">
+<style>
+:root{
+  --bg:#13040F;--card:rgba(255,255,255,.06);--card2:rgba(255,255,255,.1);--line:rgba(255,166,214,.22);
+  --fg:#FFF0F7;--muted:#D3AFC4;--acc:#FF4FA3;--acc2:#C86BFF;--ink:#2B0619;--ok:#7BE3B5;--warn:#FF8FA3;--gold:#FFD27A;
+  --aur1:rgba(255,79,163,.24);--aur2:rgba(200,107,255,.2);--aur3:rgba(255,210,122,.1);
+  --fd:'Playfair Display',Georgia,serif;--fb:'Manrope','Segoe UI',system-ui,sans-serif;--fm:'JetBrains Mono',ui-monospace,monospace;
+  color-scheme:dark}
+@media (prefers-color-scheme:light){:root:not([data-theme=dark]){
+  --bg:#FFF1F7;--card:rgba(255,255,255,.8);--card2:#fff;--line:rgba(150,20,90,.18);--fg:#3A0A28;--muted:#7C4A66;
+  --acc:#D91A7A;--acc2:#9B30D9;--ink:#fff;--ok:#11805A;--warn:#C0213F;--gold:#9A6000;--aur3:rgba(255,210,122,.3);color-scheme:light}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.6 var(--fb);padding:10px 16px 56px;position:relative;overflow-x:hidden}
+body::before{content:"";position:fixed;inset:-20%;z-index:0;pointer-events:none;background:radial-gradient(40% 36% at 18% 12%,var(--aur1),transparent 70%),radial-gradient(38% 34% at 86% 20%,var(--aur2),transparent 70%),radial-gradient(40% 40% at 60% 95%,var(--aur3),transparent 70%)}
+.wrap{position:relative;z-index:1;max-width:1100px;margin:0 auto;display:flex;flex-direction:column;gap:22px}
+[hidden]{display:none!important}
+header{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:6px;padding:10px 14px;border:1px solid var(--line);border-radius:16px;background:var(--card);backdrop-filter:blur(16px)}
+.logo{font:800 20px var(--fd);display:flex;gap:10px;align-items:center}.logo b{background:linear-gradient(100deg,var(--acc),var(--acc2));-webkit-background-clip:text;background-clip:text;color:transparent}
+.logo svg{width:26px;height:26px}
+nav{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+nav a{color:var(--fg);text-decoration:none;font-weight:600;font-size:13px;padding:7px 12px;border-radius:999px;border:1px solid var(--line)}
+nav a:hover,nav a[aria-current]{background:linear-gradient(100deg,var(--acc),var(--acc2));color:var(--ink);border-color:transparent}
+.chip{font:500 11.5px var(--fm);padding:5px 10px;border-radius:999px;border:1px solid var(--line);color:var(--muted);display:inline-flex;gap:6px;align-items:center}
+.chip i{width:8px;height:8px;border-radius:50%;background:var(--muted)}.chip.ok i{background:var(--ok)}.chip.bad i{background:var(--warn)}
+h1,h2,h3{font-family:var(--fd);margin:0;text-wrap:balance}
+h1{font-size:clamp(32px,5.5vw,54px);line-height:1.04;letter-spacing:-.025em}
+h1 em{font-style:italic;background:linear-gradient(100deg,var(--acc),var(--acc2));-webkit-background-clip:text;background-clip:text;color:transparent}
+h2{font-size:24px;letter-spacing:-.01em}
+.hero{padding:26px 4px 4px}.hero p{max-width:60ch;color:var(--muted);margin:12px 0 0;font-size:16px}
+.flow{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:16px;font:500 12px var(--fm);color:var(--muted)}
+.flow span{padding:5px 10px;border:1px solid var(--line);border-radius:999px;background:var(--card)}.flow b{color:var(--acc)}
+.grid{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,6fr);gap:18px;align-items:start}
+@media (max-width:860px){.grid{grid-template-columns:1fr}}
+.card{border:1px solid var(--line);border-radius:20px;background:var(--card);padding:20px;backdrop-filter:blur(14px)}
+label{display:block;font-weight:700;font-size:13px;margin:14px 0 6px}
+input,select,textarea{width:100%;font:inherit;color:var(--fg);background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:11px 13px}
+textarea{min-height:130px;resize:vertical}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--acc);outline-offset:1px}
+.hp{position:absolute;left:-9999px;width:1px;height:1px;opacity:0}
+.row{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-top:6px;color:var(--muted);font-size:12.5px}
+button{font:700 14px var(--fb);border:0;border-radius:999px;padding:12px 22px;cursor:pointer;color:var(--ink);background:linear-gradient(100deg,var(--acc),var(--acc2));box-shadow:0 8px 24px -8px var(--acc)}
+button:disabled{opacity:.55;cursor:progress}
+button.ghost{background:transparent;color:var(--fg);border:1px solid var(--line);box-shadow:none;padding:8px 14px;font-size:13px}
+.steps{display:grid;gap:6px;margin-top:16px;font-size:13px}
+.step{display:flex;gap:10px;align-items:center;color:var(--muted)}
+.step i{width:22px;height:22px;border-radius:50%;border:1.5px solid var(--line);display:grid;place-items:center;font:700 11px var(--fm);font-style:normal;flex:0 0 auto}
+.step.run{color:var(--fg)}.step.run i{border-color:var(--acc);animation:p 1s infinite}
+.step.done{color:var(--fg)}.step.done i{background:var(--ok);border-color:var(--ok);color:#06281c}
+.step.err{color:var(--warn)}.step.err i{border-color:var(--warn);color:var(--warn)}
+@keyframes p{50%{box-shadow:0 0 0 5px var(--aur1)}}
+#msg{margin-top:12px;font-size:13.5px;min-height:20px}.err-t{color:var(--warn)}
+.listhead{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.filters{display:flex;gap:6px;flex-wrap:wrap}
+.filters button{background:transparent;color:var(--fg);border:1px solid var(--line);box-shadow:none;padding:5px 11px;font-size:12px;font-weight:600}
+.filters button[aria-pressed=true]{background:linear-gradient(100deg,var(--acc),var(--acc2));color:var(--ink);border-color:transparent}
+.idea{border:1px solid var(--line);border-radius:16px;padding:14px 16px;background:var(--card2);margin-bottom:12px;display:grid;grid-template-columns:auto 1fr;gap:14px;animation:in .5s ease both}
+.idea.new{border-color:var(--acc);box-shadow:0 0 0 3px var(--aur1)}
+@keyframes in{from{opacity:0;transform:translateY(8px)}}
+.score{width:54px;height:54px;border-radius:50%;display:grid;place-items:center;font:800 20px var(--fd);color:var(--ink);background:conic-gradient(var(--acc) calc(var(--p)*1%),rgba(128,128,128,.25) 0)}
+.score span{width:42px;height:42px;border-radius:50%;background:var(--card2);color:var(--fg);display:grid;place-items:center}
+.meta{display:flex;gap:6px;flex-wrap:wrap;align-items:center;font:500 11.5px var(--fm);color:var(--muted)}
+.tag{padding:2px 9px;border-radius:999px;background:var(--aur2);color:var(--fg)}
+.idea p{margin:6px 0}.idea .sum{font-weight:700}
+details{margin-top:6px;font-size:13.5px}summary{cursor:pointer;color:var(--acc);font-weight:700}
+details ul{margin:6px 0 0;padding-left:18px;color:var(--muted)}
+.auth p{margin:6px 0 0;color:var(--muted);font-size:14px}.cd{font:500 12px var(--fm);color:var(--muted)}
+.empty{text-align:center;color:var(--muted);padding:26px 8px}
+.banner{border:1px dashed var(--warn);border-radius:14px;padding:12px 16px;color:var(--warn);background:var(--card)}
+.how{font-size:14px;color:var(--muted)}.how code{font-family:var(--fm);color:var(--fg)}
+footer{color:var(--muted);font-size:12.5px;text-align:center}
+@media (prefers-reduced-motion:reduce){*{animation:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo"><svg viewBox="0 0 32 32" aria-hidden="true"><defs><linearGradient id="g" x1="0" x2="1"><stop stop-color="#FF4FA3"/><stop offset="1" stop-color="#C86BFF"/></linearGradient></defs><path d="M16 3l10 8-10 18L6 11z" fill="url(#g)"/></svg>FutureSelf <b>AI</b></div>
+    <nav aria-label="Sayfalar">
+      <a href="index.html">Tam demo</a>
+      <a href="fikir.html" aria-current="page">Fikir Panosu</a>
+      <span class="chip" id="chip-db" title="Supabase bağlantısı"><i></i><span>Supabase</span></span>
+      <span class="chip" id="chip-n8n" title="n8n webhook adresi"><i></i><span>n8n</span></span>
+    </nav>
+  </header>
+
+  <section class="hero">
+    <h1>Fikrini yaz, <em>yapay zekâ</em> değerlendirsin.</h1>
+    <p>Formu doldurursun, n8n akışı tetiklenir. Yapay zekâ fikrini sınıflandırıp puanlar, sonuç Supabase'e yazılır ve sağdaki liste doğrudan veritabanından okunur.</p>
+    <div class="flow" aria-label="Akış"><span>Form</span><b>→</b><span>n8n (token doğrulama)</span><b>→</b><span>Yapay zekâ API</span><b>→</b><span>Supabase</span><b>→</b><span>bu liste</span></div>
+  </section>
+
+  <div id="cfgwarn" class="banner" hidden>Yapılandırma eksik: <code>config.js</code> içindeki n8n ve Supabase adreslerini doldur (README &gt; Kurulum).</div>
+
+  <div class="grid">
+    <section class="card" aria-labelledby="fh">
+      <div id="ideabox">
+      <h2 id="fh">Yeni fikir</h2>
+      <form id="f" novalidate>
+        <label for="nick">Takma ad</label>
+        <input id="nick" maxlength="30" autocomplete="off" placeholder="örn. Mor Kaplan">
+        <label for="stage">Aşama</label>
+        <select id="stage"><option value="fikir">Sadece fikir</option><option value="prototip">Prototip var</option><option value="kullanici">İlk kullanıcılar var</option></select>
+        <label for="idea">Fikrin <span style="font-weight:500;color:var(--muted)">(20–600 karakter)</span></label>
+        <textarea id="idea" maxlength="600" placeholder="Kim, hangi sorunu, nasıl çözecek? Bir iki cümle yeter."></textarea>
+        <input class="hp" id="website" tabindex="-1" autocomplete="off" aria-hidden="true">
+        <div class="row"><span>Gerçek ad, telefon veya e-posta yazma; liste herkese açık.</span><span id="cnt">0/600</span></div>
+        <div style="margin-top:16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <button id="go" type="submit">Değerlendir</button>
+          <span id="msg" role="status" aria-live="polite"></span>
+        </div>
+      </form>
+      <div class="steps" id="steps" hidden>
+        <div class="step" data-s="1"><i>1</i>Form n8n'e gönderildi</div>
+        <div class="step" data-s="2"><i>2</i>n8n: doğrula → Yapay zekâ analizi → Supabase'e yaz</div>
+        <div class="step" data-s="3"><i>3</i>Liste Supabase'den yeniden okundu</div>
+      </div>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="lh">
+      <div class="listhead">
+        <h2 id="lh">Son değerlendirmeler</h2>
+        <button class="ghost" id="refresh" type="button">Yenile</button>
+      </div>
+      <div class="filters" id="filters" role="group" aria-label="Kategori filtresi" style="margin-bottom:14px"></div>
+      <div id="list" aria-live="polite"></div>
+    </section>
+  </div>
+
+  <section class="card how">
+    <h2 style="margin-bottom:8px">Nasıl çalışıyor?</h2>
+    <p style="margin:0 0 6px"><b>Yazma:</b> sayfa fikri <code>n8n</code> webhook'una gönderir; veritabanı anahtarı tarayıcıda yoktur. n8n girdiyi doğrular, Yapay zekâ'a değerlendirme promptunu yollar, gelen JSON'u denetler ve <code>ideas</code> ile <code>idea_analyses</code> tablolarına yazar.</p>
+    <p style="margin:0"><b>Okuma:</b> sayfa listeyi Supabase REST API'sinden <code>anon</code> anahtarıyla okur; satır güvenliği (RLS) yalnızca okumaya izin verir.</p>
+  </section>
+  <footer>FutureSelf AI · okul projesi · Değerlendirmeler yapay zekâ tahminidir, kesin sonuç değildir.</footer>
+</div>
+
+<script src="config.js" charset="utf-8"></script>
+<script src="auth.js" charset="utf-8"></script>
+<script>
+(function(){
+  'use strict';
+  var C=window.APP_CONFIG||{};
+  var $=function(id){return document.getElementById(id)};
+  var CAT={egitim:'Eğitim',saglik:'Sağlık',tarim:'Tarım',finans:'Finans',yazilim:'Yazılım / AI',cevre:'Çevre',sosyal:'Sosyal',diger:'Diğer'};
+  var STAGE={fikir:'Sadece fikir',prototip:'Prototip var',kullanici:'İlk kullanıcılar var'};
+  var placeholder=function(v){return !v||/PROJE-ID|KULLANICI|ANON_PUBLIC/.test(v)};
+  var cfgOk=!placeholder(C.SUPABASE_URL)&&!placeholder(C.SUPABASE_ANON_KEY);
+  var n8nOk=!placeholder(C.N8N_IDEA_URL);
+  var state={rows:[],filter:'all',newId:null};
+
+
+  function chip(id,ok,txt){var c=$(id);c.className='chip '+(ok?'ok':'bad');c.lastChild.textContent=txt}
+  chip('chip-n8n',n8nOk,n8nOk?'n8n adresi tanımlı':'n8n adresi yok');
+  chip('chip-db',false,cfgOk?'Supabase…':'Supabase ayarı yok');
+  if(!cfgOk||!n8nOk)$('cfgwarn').hidden=false;
+
+  function el(tag,cls,txt){var e=document.createElement(tag);if(cls)e.className=cls;if(txt!=null)e.textContent=txt;return e}
+  function one(a){return Array.isArray(a)?a[0]:a}
+  function ago(iso){var s=(Date.now()-new Date(iso))/1000;if(s<60)return 'az önce';if(s<3600)return Math.floor(s/60)+' dk önce';if(s<86400)return Math.floor(s/3600)+' sa önce';return new Date(iso).toLocaleDateString('tr-TR')}
+
+  function card(row,isNew){
+    var a=one(row.idea_analyses)||{};
+    var d=el('article','idea'+(isNew?' new':''));
+    var sc=el('div','score');sc.style.setProperty('--p',(a.score||0)*10);sc.appendChild(el('span',null,a.score!=null?a.score:'–'));sc.setAttribute('aria-label','Puan '+a.score+' / 10');
+    var b=el('div');
+    var m=el('div','meta');m.appendChild(el('span','tag',CAT[a.category]||'—'));m.appendChild(el('span',null,row.nickname));m.appendChild(el('span',null,'· '+(STAGE[row.stage]||'')));m.appendChild(el('span',null,'· '+ago(row.created_at)));
+    b.appendChild(m);
+    b.appendChild(el('p','sum',a.summary||''));
+    b.appendChild(el('p',null,row.idea_text)).style.color='var(--muted)';
+    if(a.score_reason)b.appendChild(el('p',null,'Puan nedeni: '+a.score_reason)).style.fontSize='13px';
+    var dt=el('details');dt.appendChild(el('summary',null,'Riskler ve sonraki adımlar'));
+    [['Riskler',a.risks],['Bu hafta yap',a.next_steps]].forEach(function(p){
+      dt.appendChild(el('b',null,p[0]));var ul=el('ul');(p[1]||[]).forEach(function(t){ul.appendChild(el('li',null,t))});dt.appendChild(ul)});
+    b.appendChild(dt);d.appendChild(sc);d.appendChild(b);return d;
+  }
+
+  function renderFilters(){
+    var f=$('filters');f.textContent='';
+    var used={};state.rows.forEach(function(r){var a=one(r.idea_analyses);if(a)used[a.category]=1});
+    [['all','Hepsi']].concat(Object.keys(used).map(function(k){return [k,CAT[k]||k]})).forEach(function(p){
+      var b=el('button',null,p[1]);b.type='button';b.setAttribute('aria-pressed',String(state.filter===p[0]));
+      b.onclick=function(){state.filter=p[0];renderFilters();renderList()};f.appendChild(b)});
+  }
+  function renderList(){
+    var L=$('list');L.textContent='';
+    var rows=state.rows.filter(function(r){var a=one(r.idea_analyses);return state.filter==='all'||(a&&a.category===state.filter)});
+    if(!rows.length){L.appendChild(el('div','empty',cfgOk?'Henüz kayıt yok. İlk fikri sen gönder.':'Liste, Supabase ayarı yapılınca burada görünecek.'));return}
+    rows.forEach(function(r){L.appendChild(card(r,r.id===state.newId))});
+  }
+
+  async function load(){
+    if(!cfgOk){renderList();return false}
+    var url=C.SUPABASE_URL+'/rest/v1/ideas?select=id,nickname,idea_text,stage,created_at,idea_analyses(category,summary,score,score_reason,risks,next_steps)&order=created_at.desc&limit=30';
+    try{
+      var hd={apikey:C.SUPABASE_ANON_KEY};if(/^eyJ/.test(C.SUPABASE_ANON_KEY))hd.Authorization='Bearer '+C.SUPABASE_ANON_KEY;   // yeni sb_publishable anahtarlar JWT değil: yalnızca apikey başlığı
+      var r=await fetch(url,{headers:hd});
+      if(!r.ok)throw new Error('HTTP '+r.status);
+      state.rows=await r.json();chip('chip-db',true,'Supabase bağlı · '+state.rows.length+' kayıt');
+      renderFilters();renderList();return true;
+    }catch(e){chip('chip-db',false,'Supabase okunamadı');
+      $('list').textContent='';$('list').appendChild(el('div','empty err-t','Liste okunamadı ('+e.message+'). Adres/anahtar ve RLS politikasını kontrol et.'));return false}
+  }
+
+  function setStep(n,cls){var s=document.querySelector('.step[data-s="'+n+'"]');s.className='step '+cls;s.firstChild.textContent=cls==='done'?'✓':cls==='err'?'!':n}
+
+  $('idea').addEventListener('input',function(){$('cnt').textContent=this.value.length+'/600'});
+  $('refresh').onclick=load;
+
+  $('f').addEventListener('submit',async function(ev){
+    ev.preventDefault();
+    var msg=$('msg');msg.className='';msg.textContent='';
+    var nick=$('nick').value.trim(),idea=$('idea').value.trim();
+    if(nick.length<2){msg.className='err-t';msg.textContent='Takma ad en az 2 karakter olmalı.';return}
+    if(idea.length<20){msg.className='err-t';msg.textContent='Fikir en az 20 karakter olmalı.';return}
+    if(!n8nOk){msg.className='err-t';msg.textContent='n8n adresi config.js içinde tanımlı değil.';return}
+    var ses=await FSAuth.fresh();
+    if(!ses){msg.className='err-t';msg.textContent='Oturum süresi doldu, tekrar giriş yap.';return}
+    $('go').disabled=true;$('steps').hidden=false;setStep(1,'run');setStep(2,'');setStep(3,'');
+    var ctl=new AbortController(),to=setTimeout(function(){ctl.abort()},60000);
+    try{
+      var r=await fetch(C.N8N_IDEA_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},signal:ctl.signal,   // text/plain: tarayıcı CORS ön kontrolü (preflight) yapmaz
+        body:JSON.stringify({token:ses.access_token,nickname:nick,idea:idea,stage:$('stage').value,website:$('website').value})});
+      setStep(1,'done');setStep(2,'run');
+      var j=await r.json().catch(function(){return {}});
+      if(r.status===401){FSAuth.logout();throw new Error('Oturum geçersiz, tekrar giriş yap.')}
+      if(!r.ok||!j.ok)throw new Error(j.error||('Sunucu hatası ('+r.status+')'));
+      setStep(2,'done');setStep(3,'run');
+      state.newId=j.idea&&j.idea.id;state.filter='all';
+      var ok=await load();
+      if(!ok&&j.idea){state.rows.unshift(Object.assign({},j.idea,{idea_analyses:j.analysis}));renderList()}
+      setStep(3,ok?'done':'err');
+      msg.className='';msg.textContent='Kaydedildi. Puanın: '+j.analysis.score+'/10';
+      $('idea').value='';$('cnt').textContent='0/600';
+    }catch(e){
+      var cur=document.querySelector('.step.run');if(cur)cur.className='step err';
+      msg.className='err-t';msg.textContent=e.name==='AbortError'?'Zaman aşımı: n8n 60 sn içinde yanıt vermedi.':(e.message==='Failed to fetch'?'n8n\'e ulaşılamadı (adres veya CORS).':e.message);
+    }finally{clearTimeout(to);$('go').disabled=false}
+  });
+
+  load();
+})();
+</script>
+</body>
+</html>
